@@ -8,3 +8,5 @@
 # Requirements
     1. Tensorflow
     2. tqdm
+    3. gym
+    4. opencv (python)  
