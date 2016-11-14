@@ -9,4 +9,5 @@
     1. Tensorflow
     2. tqdm
     3. gym
-    4. opencv (python)  
+    4. scipy or opencv (python)  
+    5. Easydict
