@@ -4,9 +4,16 @@
 # Enhancement Copyright 2016, Mrinal Haloi
 # -------------------------------------------------------------------#
 
-import cv2
 import gym
 import random
+import numpy as np
+
+try:
+    import scipy.misc
+    imresize = scipy.misc.imresize
+except:
+    import cv2
+    imresize = cv2.resize
 
 
 class Environment(object):
@@ -45,7 +52,9 @@ class Environment(object):
 
     @ property
     def screen(self):
-        return cv2.resize(cv2.cvtColor(self._screen, cv2.COLOR_RGB2GRAY) / 255., self.dims)
+        y = 0.2126 * self._screen[:, :, 0] + 0.7152 * self._screen[:, :, 1] + 0.0722 * self._screen[:, :, 2]
+        y = y.astype(np.uint8)
+        return imresize(y, self.dims)
 
     @property
     def action_size(self):

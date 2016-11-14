@@ -105,6 +105,8 @@ class Solver(object):
                     ep_reward = 0.
                     ep_rewards = []
                     actions = []
+        end_time = time.time()
+        print('Total training time %6.1fs' % start_time - end_time)
 
     def predict(self, s_t, test_ep=None):
         ep = test_ep or (cfg.ep_end + max(0., (cfg.ep_start - cfg.ep_end)
@@ -162,11 +164,12 @@ class Solver(object):
         self.total_q += q_t.mean()
         self.update_count += 1
 
+
     def update_target_graph(self, tfVars, tau):
-        total_vars = len(tfVars)
+        main_target = utils.get_vars_main_target(tfVars)
         op_holder = []
-        for idx, var in enumerate(tfVars[0:total_vars / 2]):
-            op_holder.append(tfVars[idx + total_vars / 2].assign((var.value() * tau) + ((1 - tau) * tfVars[idx + total_vars / 2].value())))
+        for idx, var in enumerate(main_target['main_vars']):
+            op_holder.append(main_target['target_vars'][idx].assign((var.value() * tau) + ((1 - tau) * main_target['target_vars'][idx].value())))
         return op_holder
 
     def update_target(self, op_holder, sess):
@@ -181,25 +184,24 @@ class Solver(object):
             print "Target Set Failed"
 
     def tower_loss(self, inputs, target_inputs):
-        with tf.variable_scope('optimizer'):
-            model_q = Model()
-            model_target_q = Model(is_target_q=True)
-            end_points_q = model_q.model_def(inputs, self.env, name='main_q')
-            end_points_target_q = model_target_q.model_def(target_inputs, self.env, name='target_q')
+        model_q = Model()
+        model_target_q = Model(is_target_q=True)
+        end_points_q = model_q.model_def(inputs, self.env, name='main_q')
+        end_points_target_q = model_target_q.model_def(target_inputs, self.env, name='target_q')
 
-            action_one_hot = tf.one_hot(self.action, self.env.action_size, 1.0, 0.0, name='action_one_hot')
-            q_acted = tf.reduce_sum(end_points_q['q'] * action_one_hot, reduction_indices=1, name='q_acted')
+        action_one_hot = tf.one_hot(self.action, self.env.action_size, 1.0, 0.0, name='action_one_hot')
+        q_acted = tf.reduce_sum(end_points_q['q'] * action_one_hot, reduction_indices=1, name='q_acted')
 
-            delta = self.target_q_t - q_acted
-            clipped_delta = tf.clip_by_value(delta, cfg.min_delta, cfg.max_delta, name='clipped_delta')
+        delta = self.target_q_t - q_acted
+        clipped_delta = tf.clip_by_value(delta, cfg.min_delta, cfg.max_delta, name='clipped_delta')
 
-            loss = tf.reduce_mean(tf.square(clipped_delta), name='loss')
-            self.learning_rate_step = tf.placeholder('int64', None, name='learning_rate_step')
-            learning_rate_op = tf.maximum(self.learning_rate_minimum, tf.train.exponential_decay(
-                cfg.TRAIN.learning_rate,
-                self.learning_rate_step,
-                cfg.TRAIN.learning_rate_decay_step,
-                cfg.TRAIN.learning_rate_decay,
-                staircase=True))
-            optim = tf.train.RMSPropOptimizer(learning_rate_op, momentum=0.95, epsilon=0.01).minimize(loss)
-            return optim, loss, end_points_q, end_points_target_q
+        loss = tf.reduce_mean(tf.square(clipped_delta), name='loss')
+        self.learning_rate_step = tf.placeholder('int64', None, name='learning_rate_step')
+        learning_rate_op = tf.maximum(self.learning_rate_minimum, tf.train.exponential_decay(
+            cfg.TRAIN.learning_rate,
+            self.learning_rate_step,
+            cfg.TRAIN.learning_rate_decay_step,
+            cfg.TRAIN.learning_rate_decay,
+            staircase=True))
+        optim = tf.train.RMSPropOptimizer(learning_rate_op, momentum=0.95, epsilon=0.01).minimize(loss)
+        return optim, loss, end_points_q, end_points_target_q

@@ -9,6 +9,19 @@ import tensorflow as tf
 import os
 
 
+def get_vars_main_target(t_vars):
+    main_vars = [var for var in t_vars if var.name.startswith('main_')]
+    target_vars = [var for var in t_vars if var.name.startswith('target_')]
+    for x in main_vars:
+        assert x not in target_vars
+    for x in target_vars:
+        assert x not in main_vars
+    for x in t_vars:
+        assert x in main_vars or x in target_vars
+
+    return {'main_vars': main_vars, 'target_vars': target_vars}
+
+
 def processState(state1):
     return np.reshape(state1, [21168])
 
