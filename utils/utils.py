@@ -7,6 +7,7 @@
 import numpy as np
 import tensorflow as tf
 import os
+import time
 
 
 def get_vars_main_target(t_vars):
@@ -76,3 +77,7 @@ def load_model(saver, sess, model_dir):
     else:
         print(" [!] Load FAILED: %s" % model_dir)
     return False
+
+
+def get_time():
+    return time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())

@@ -1,27 +1,27 @@
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
-import random
 import time
 from core.history import History
 from dataset.replay import ExperienceBuffer
 from models.custom_model import Model
-from config.config import cfg
+from core.base import Base
 from utils import utils
 
 
-class Solver(object):
+class Solver(Base):
     def __init__(self, cfg, environment, sess, model_dir):
+        super(Solver, self).__init__(cfg)
         self.sess = sess
         self.weight_dir = 'weights'
-        self.inputs = tf.placeholder('float32', [None, cfg.screen_height, cfg.screen_width, cfg.history_length], name='inputs')
-        self.target_inputs = tf.placeholder('float32', [None, cfg.screen_height, cfg.screen_width, cfg.history_length], name='target_inputs')
+        self.inputs = tf.placeholder('float32', [None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='inputs')
+        self.target_inputs = tf.placeholder('float32', [None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='target_inputs')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
         self.action = tf.placeholder('int64', [None], name='action')
         self.env = environment
-        self.history = History(cfg)
+        self.history = History(self.cfg)
         self.model_dir = model_dir
-        self.memory = ExperienceBuffer(cfg, self.model_dir)
+        self.memory = ExperienceBuffer(self.cfg, self.model_dir)
         self.learning_rate_minimum = 0.0001
         self.double_q = True
 
@@ -40,24 +40,25 @@ class Solver(object):
 
         screen, reward, action, terminal = self.env.new_random_game()
         self.optim, self.loss, self.end_points_q, self.end_points_target_q = self.tower_loss(self.inputs, self.target_inputs)
-        self.targetops = self.update_target_graph(tf.trainable_variables(), cfg.tau)
+        self.targetops = self.update_target_graph(tf.trainable_variables(), self.cfg.tau)
         self.saver = tf.train.Saver(max_to_keep=None)
 
         init = tf.initialize_all_variables()
         self.sess.run(init)
         start_step = self.step_op.eval()
 
-        for _ in range(cfg.history_length):
+        for _ in range(self.cfg.history_length):
             self.history.add(screen)
 
-        for self.step in tqdm(range(start_step, cfg.max_step), ncols=70, initial=start_step):
-            if self.step == cfg.learn_start:
+        for self.step in tqdm(range(start_step, self.cfg.max_step), ncols=70, initial=start_step):
+            if self.step == self.cfg.learn_start:
                 num_game, self.update_count, ep_reward = 0, 0, 0.
                 total_reward, self.total_loss, self.total_q = 0., 0., 0.
                 ep_rewards, actions = [], []
 
+            ep = (self.cfg.ep_end + max(0., (self.cfg.ep_start - self.cfg.ep_end) * (self.cfg.ep_end_t - max(0., self.step - self.cfg.learn_start)) / self.cfg.ep_end_t))
             # 1. predict
-            action = self.predict(self.history.get())
+            action = self.predict(self.end_points_q['pred_action'], self.history.get(), ep=ep)
             # 2. act
             screen, reward, terminal = self.env.act(action, is_training=True)
             # 3. observe
@@ -75,9 +76,9 @@ class Solver(object):
             actions.append(action)
             total_reward += reward
 
-            if self.step >= cfg.learn_start:
-                if self.step % cfg.test_step == cfg.test_step - 1:
-                    avg_reward = total_reward / cfg.test_step
+            if self.step >= self.cfg.learn_start:
+                if self.step % self.cfg.test_step == self.cfg.test_step - 1:
+                    avg_reward = total_reward / self.cfg.test_step
                     avg_loss = self.total_loss / self.update_count
                     avg_q = self.total_q / self.update_count
 
@@ -108,32 +109,21 @@ class Solver(object):
         end_time = time.time()
         print('Total training time %6.1fs' % start_time - end_time)
 
-    def predict(self, s_t, test_ep=None):
-        ep = test_ep or (cfg.ep_end + max(0., (cfg.ep_start - cfg.ep_end)
-          * (cfg.ep_end_t - max(0., self.step - cfg.learn_start)) / cfg.ep_end_t))
-
-        if random.random() < ep:
-            action = random.randrange(self.env.action_size)
-        else:
-            action = self.end_points_q['pred_action'].eval({self.inputs: [s_t]})[0]
-
-        return action
-
     def observe(self, screen, reward, action, terminal):
-        reward = max(cfg.min_reward, min(cfg.max_reward, reward))
+        reward = max(self.cfg.min_reward, min(self.cfg.max_reward, reward))
 
         self.history.add(screen)
         self.memory.add(screen, reward, action, terminal)
 
-        if self.step > cfg.learn_start:
-            if self.step % cfg.train_frequency == 0:
+        if self.step > self.cfg.learn_start:
+            if self.step % self.cfg.train_frequency == 0:
                 self.train_mini_batch()
 
-            if self.step % cfg.target_q_update_step == cfg.target_q_update_step - 1:
+            if self.step % self.cfg.target_q_update_step == self.cfg.target_q_update_step - 1:
                 self.update_target(self.targetops, self.sess)
 
     def train_mini_batch(self):
-        if self.memory.count < cfg.history_length:
+        if self.memory.count < self.cfg.history_length:
             return
         else:
             s_t, action, reward, s_t_plus_1, terminal = self.memory.sample()
@@ -145,13 +135,13 @@ class Solver(object):
             q_t_plus_1_with_pred_action = self.end_points_target_q['target_q_with_idx'].eval({
                 self.target_inputs: s_t_plus_1,
                 self.end_points_target_q['target_q_idx']: [[idx, pred_a] for idx, pred_a in enumerate(pred_action)]})
-            target_q_t = (1. - terminal) * cfg.discount * q_t_plus_1_with_pred_action + reward
+            target_q_t = (1. - terminal) * self.cfg.discount * q_t_plus_1_with_pred_action + reward
         else:
             q_t_plus_1 = self.end_points_target_q['q'].eval({self.target_inputs: s_t_plus_1})
 
             terminal = np.array(terminal) + 0.
             max_q_t_plus_1 = np.max(q_t_plus_1, axis=1)
-            target_q_t = (1. - terminal) * cfg.discount * max_q_t_plus_1 + reward
+            target_q_t = (1. - terminal) * self.cfg.discount * max_q_t_plus_1 + reward
 
         _, q_t, loss = self.sess.run([self.optim, self.end_points_q['q'], self.loss], {
             self.target_q_t: target_q_t,
@@ -165,24 +155,6 @@ class Solver(object):
         self.update_count += 1
 
 
-    def update_target_graph(self, tfVars, tau):
-        main_target = utils.get_vars_main_target(tfVars)
-        op_holder = []
-        for idx, var in enumerate(main_target['main_vars']):
-            op_holder.append(main_target['target_vars'][idx].assign((var.value() * tau) + ((1 - tau) * main_target['target_vars'][idx].value())))
-        return op_holder
-
-    def update_target(self, op_holder, sess):
-        for op in op_holder:
-            sess.run(op)
-        total_vars = len(tf.trainable_variables())
-        a = tf.trainable_variables()[0].eval(session=sess)
-        b = tf.trainable_variables()[total_vars / 2].eval(session=sess)
-        if a.all() == b.all():
-            print "Target Set Success"
-        else:
-            print "Target Set Failed"
-
     def tower_loss(self, inputs, target_inputs):
         model_q = Model()
         model_target_q = Model(is_target_q=True)
@@ -193,15 +165,15 @@ class Solver(object):
         q_acted = tf.reduce_sum(end_points_q['q'] * action_one_hot, reduction_indices=1, name='q_acted')
 
         delta = self.target_q_t - q_acted
-        clipped_delta = tf.clip_by_value(delta, cfg.min_delta, cfg.max_delta, name='clipped_delta')
+        clipped_delta = tf.clip_by_value(delta, self.cfg.min_delta, self.cfg.max_delta, name='clipped_delta')
 
         loss = tf.reduce_mean(tf.square(clipped_delta), name='loss')
         self.learning_rate_step = tf.placeholder('int64', None, name='learning_rate_step')
         learning_rate_op = tf.maximum(self.learning_rate_minimum, tf.train.exponential_decay(
-            cfg.TRAIN.learning_rate,
+            self.cfg.TRAIN.learning_rate,
             self.learning_rate_step,
-            cfg.TRAIN.learning_rate_decay_step,
-            cfg.TRAIN.learning_rate_decay,
+            self.cfg.TRAIN.learning_rate_decay_step,
+            self.cfg.TRAIN.learning_rate_decay,
             staircase=True))
         optim = tf.train.RMSPropOptimizer(learning_rate_op, momentum=0.95, epsilon=0.01).minimize(loss)
         return optim, loss, end_points_q, end_points_target_q
