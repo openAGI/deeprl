@@ -61,6 +61,18 @@ class Environment(object):
         return self.env.action_space.n
 
     @property
+    def action_dim(self):
+        return self.env.action_space.shape[0]
+
+    @property
+    def state_dim(self):
+        return self.env.observation_space.shape[0]
+
+    @property
+    def action_bound(self):
+        return self.env.action_space.high
+
+    @property
     def lives(self):
         return self.env.ale.lives()
 

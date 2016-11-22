@@ -10,9 +10,9 @@ import os
 import time
 
 
-def get_vars_main_target(t_vars):
-    main_vars = [var for var in t_vars if var.name.startswith('main_')]
-    target_vars = [var for var in t_vars if var.name.startswith('target_')]
+def get_vars_main_target(t_vars, main_name='main_q', target_name='target_q'):
+    main_vars = [var for var in t_vars if var.name.startswith(main_name)]
+    target_vars = [var for var in t_vars if var.name.startswith(target_name)]
     for x in main_vars:
         assert x not in target_vars
     for x in target_vars:
@@ -81,3 +81,13 @@ def load_model(saver, sess, model_dir):
 
 def get_time():
     return time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+
+
+def get_input_shape(x):
+    "Return input shape"
+    if isinstance(x, tf.Tensor):
+        return x.get_shape().as_list()
+    elif type(x) in [np.ndarray, list, tuple]:
+        return np.shape(x)
+    else:
+        raise Exception("Invalid input layer")
