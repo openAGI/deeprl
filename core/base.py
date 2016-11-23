@@ -15,8 +15,16 @@ class Base(object):
 
         return action
 
-    def update_target_graph(self, tfVars, tau):
-        main_target = utils.get_vars_main_target(tfVars)
+    def predict_target(self, pred_action_op, s_t, ep=0.1):
+        if random.random() < ep:
+            action = random.randrange(self.env.action_size)
+        else:
+            action = pred_action_op.eval({self.target_inputs: [s_t]})[0]
+
+        return action
+
+    def update_target_graph(self, tfVars, tau, main_name='main_q', target_name='target_q'):
+        main_target = utils.get_vars_main_target(tfVars, main_name=main_name, target_name=target_name)
         op_holder = []
         for idx, var in enumerate(main_target['main_vars']):
             op_holder.append(main_target['target_vars'][idx].assign((var.value() * tau) + ((1 - tau) * main_target['target_vars'][idx].value())))
