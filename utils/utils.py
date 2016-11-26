@@ -91,3 +91,9 @@ def get_input_shape(x):
         return np.shape(x)
     else:
         raise Exception("Invalid input layer")
+
+
+def rms(x, name=None):
+    if name is None:
+        name = x.op.name + '/rms'
+    return tf.sqrt(tf.reduce_mean(tf.square(x)), name=name)
