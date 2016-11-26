@@ -30,10 +30,14 @@ class Environment(object):
         self.terminal = True
 
     def new_game(self, from_random_game=False):
-        if self.lives == 0:
+        try:
+            if self.lives == 0:
+                self._screen = self.env.reset()
+                self._step(0)
+                self.render()
+        except AttributeError:
             self._screen = self.env.reset()
-        self._step(0)
-        self.render()
+            self.render()
         return self.screen, 0, 0, self.terminal
 
     def new_random_game(self):

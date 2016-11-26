@@ -1,3 +1,8 @@
+# -------------------------------------------------------------------#
+# Released under the MIT license (https://opensource.org/licenses/MIT)
+# Contact: mrinal.haloi11@gmail.com
+# Enhancement Copyright 2016, Mrinal Haloi
+# -------------------------------------------------------------------#
 import tensorflow as tf
 import random
 from utils import utils
@@ -7,19 +12,41 @@ class Base(object):
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def predict(self, pred_action_op, s_t, ep=0.1):
-        if random.random() < ep:
-            action = random.randrange(self.env.action_size)
-        else:
-            action = pred_action_op.eval({self.inputs: [s_t]})[0]
+    def predict(self, pred_action_op, s_t, ep=0.1, agent_type=None):
+        if agent_type is None:
+            if random.random() < ep:
+                action = random.randrange(self.env.action_size)
+            else:
+                action = pred_action_op.eval({self.inputs: [s_t]})[0]
+        elif agent_type == 'actor':
+            if random.random() < ep:
+                action = random.randrange(self.env.action_size)
+            else:
+                action = pred_action_op.eval({self.actor_inputs: [s_t]})[0]
+        elif agent_type == 'critic':
+            if random.random() < ep:
+                action = random.randrange(self.env.action_size)
+            else:
+                action = pred_action_op.eval({self.critic_inputs: [s_t]})[0]
 
         return action
 
-    def predict_target(self, pred_action_op, s_t, ep=0.1):
-        if random.random() < ep:
-            action = random.randrange(self.env.action_size)
-        else:
-            action = pred_action_op.eval({self.target_inputs: [s_t]})[0]
+    def predict_target(self, pred_action_op, s_t, ep=0.1, agent_type=None):
+        if agent_type is None:
+            if random.random() < ep:
+                action = random.randrange(self.env.action_size)
+            else:
+                action = pred_action_op.eval({self.target_inputs: [s_t]})[0]
+        elif agent_type == 'actor':
+            if random.random() < ep:
+                action = random.randrange(self.env.action_size)
+            else:
+                action = pred_action_op.eval({self.actor_target_inputs: [s_t]})[0]
+        elif agent_type == 'critic':
+            if random.random() < ep:
+                action = random.randrange(self.env.action_size)
+            else:
+                action = pred_action_op.eval({self.critic_target_inputs: [s_t]})[0]
 
         return action
 
