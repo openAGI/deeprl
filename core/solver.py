@@ -1,3 +1,8 @@
+# -------------------------------------------------------------------#
+# Released under the MIT license (https://opensource.org/licenses/MIT)
+# Contact: mrinal.haloi11@gmail.com
+# Enhancement Copyright 2016, Mrinal Haloi
+# -------------------------------------------------------------------#
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
@@ -7,10 +12,11 @@ from dataset.replay import ExperienceBuffer
 from models.custom_model import Model
 from core.base import Base
 from utils import utils
+from core import logger
 
 
 class Solver(Base):
-    def __init__(self, cfg, environment, sess, model_dir):
+    def __init__(self, cfg, environment, sess, model_dir, log_file_pathname='/tmp/deeprl.log'):
         super(Solver, self).__init__(cfg)
         self.sess = sess
         self.weight_dir = 'weights'
@@ -24,6 +30,7 @@ class Solver(Base):
         self.memory = ExperienceBuffer(self.cfg, self.model_dir)
         self.learning_rate_minimum = 0.0001
         self.double_q = True
+        self.log_file_path = log_file_pathname
 
         with tf.variable_scope('step'):
             self.step_op = tf.Variable(0, trainable=False, name='step')
@@ -32,6 +39,8 @@ class Solver(Base):
 
     def train(self):
         start_time = time.time()
+        logger.setFileHandler(self.log_file_path)
+        logger.setVerbosity(logger.DEBUG)
 
         num_game, self.update_count, ep_reward = 0, 0, 0.
         total_reward, self.total_loss, self.total_q = 0., 0., 0.
@@ -72,9 +81,12 @@ class Solver(Base):
                 ep_reward = 0.
             else:
                 ep_reward += reward
+            logger.debug('Step: %d, Reward: %f' % (self.step, reward))
+            logger.debug('Step: %d, Expected Reward: %f' % (self.step, ep_reward))
 
             actions.append(action)
             total_reward += reward
+            logger.debug('Step: %d, Total Reward: %f' % (self.step, total_reward))
 
             if self.step >= self.cfg.learn_start:
                 if self.step % self.cfg.test_step == self.cfg.test_step - 1:
@@ -91,6 +103,8 @@ class Solver(Base):
 
                     print '\navg_r: %.4f, avg_l: %.6f, avg_q: %3.6f, avg_ep_r: %.4f, max_ep_r: %.4f, min_ep_r: %.4f, # game: %d' \
                         % (avg_reward, avg_loss, avg_q, avg_ep_reward, max_ep_reward, min_ep_reward, num_game)
+                    logger.debug('Avg_R: %.4f, Avg_L: %.6f, Avg_Q: %3.6f, Avg_EP_R: %.4f, Max_EP_R: %.4f, Min_EP_R: %.4f, # Game: %d' %
+                        (avg_reward, avg_loss, avg_q, avg_ep_reward, max_ep_reward, min_ep_reward, num_game))
 
                     if max_avg_ep_reward * 0.9 <= avg_ep_reward:
                         self.step_assign_op.eval({self.step_input: self.step + 1})
@@ -153,7 +167,6 @@ class Solver(Base):
         self.total_loss += loss
         self.total_q += q_t.mean()
         self.update_count += 1
-
 
     def tower_loss(self, inputs, target_inputs):
         model_q = Model()

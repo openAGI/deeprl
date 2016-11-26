@@ -10,6 +10,9 @@ from core import initializers as initz
 batch_norm_tf = tf.contrib.layers.batch_norm
 
 
+__all__ = ['fully_connected']
+
+
 def fully_connected(x, n_output, is_training, reuse, trainable=True, w_init=initz.he_normal(), b_init=0.0,
                     w_regularizer=tf.nn.l2_loss, name='fc', batch_norm=None, batch_norm_args=None, activation=None,
                     outputs_collections=None, use_bias=True):
