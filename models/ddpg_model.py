@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------#
 # Released under the MIT license (https://opensource.org/licenses/MIT)
 # Contact: mrinal.haloi11@gmail.com
-# Enhancement Copyright 2016, Mrinal Haloi
+# Copyright 2016, Mrinal Haloi
 # -------------------------------------------------------------------#
 
 import tensorflow as tf
@@ -30,7 +30,7 @@ class CriticModel(object):
     def __init__(self):
         self.end_points = {}
 
-    def model_def(self, inputs, action_inputs, env, is_training=True, reuse=None, activation=tf.nn.relu, batchnorm=True, minval=-0.003, maxval=0.003, name=None):
+    def model_def(self, inputs, action_inputs, is_training=True, reuse=None, activation=tf.nn.relu, batchnorm=True, minval=-0.003, maxval=0.003, name=None):
         with tf.variable_scope('critic'):
             fc1 = fc(inputs, 400, is_training, reuse, activation=activation)
             self.end_points['fc1'] = fc1

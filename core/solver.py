@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------#
 # Released under the MIT license (https://opensource.org/licenses/MIT)
 # Contact: mrinal.haloi11@gmail.com
-# Enhancement Copyright 2016, Mrinal Haloi
+# Copyright 2016, Mrinal Haloi
 # -------------------------------------------------------------------#
 import tensorflow as tf
 import numpy as np

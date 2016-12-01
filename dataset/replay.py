@@ -1,10 +1,9 @@
-import numpy as np
 # -------------------------------------------------------------------#
 # Released under the MIT license (https://opensource.org/licenses/MIT)
 # Contact: mrinal.haloi11@gmail.com
 # Enhancement Copyright 2016, Mrinal Haloi
 # -------------------------------------------------------------------#
-
+import numpy as np
 import random
 
 

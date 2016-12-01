@@ -1,13 +1,12 @@
 # -------------------------------------------------------------------#
 # Released under the MIT license (https://opensource.org/licenses/MIT)
 # Contact: mrinal.haloi11@gmail.com
-# Enhancement Copyright 2016, Mrinal Haloi
+# Copyright 2016, Mrinal Haloi
 # -------------------------------------------------------------------#
 
 import tensorflow as tf
 
 
-# TODO objectify the model
 class Model(object):
     def __init__(self, is_target_q=False):
         self.end_points = {}
