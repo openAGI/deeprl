@@ -5,12 +5,36 @@
 # -------------------------------------------------------------------#
 import tensorflow as tf
 import random
+from core.history import History
+from core.lr_policy import PolyDecayPolicy
+from dataset.replay import ExperienceBuffer
+import core.logger as log
 from utils import utils
 
 
 class Base(object):
-    def __init__(self, cfg):
+    def __init__(self, cfg, environment, sess, model_dir, log_file_pathname='/tmp/deeprl.log', verbosity=0, lr_policy=PolyDecayPolicy(0.001), start_epoch=1, resume_lr=0.001, n_iters_per_epoch=100, gpu_memory_fraction=0.9):
         self.cfg = cfg
+        self.sess = sess
+        self.weight_dir = 'weights'
+        self.env = environment
+        self.history = History(self.cfg)
+        self.model_dir = model_dir
+        self.memory = ExperienceBuffer(self.cfg, self.model_dir)
+        self.learning_rate_minimum = 0.0001
+        self.learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate_placeholder")
+        self.lr_policy = lr_policy
+        self.lr_policy.start_epoch = start_epoch
+        self.lr_policy.base_lr = resume_lr
+        self.lr_policy.n_iters_per_epoch = n_iters_per_epoch
+        self.gpu_memory_fraction = gpu_memory_fraction
+        log.setFIleHandler(log_file_pathname)
+        log.setVerbosity(self._verbosity(verbosity, log))
+
+        with tf.variable_scope('step'):
+            self.step_op = tf.Variable(0, trainable=False, name='step')
+            self.step_input = tf.placeholder('int32', None, name='step_input')
+            self.step_assign_op = self.step_op.assign(self.step_input)
 
     def predict(self, pred_action_op, s_t, ep=0.1, agent_type=None):
         if agent_type is None:
@@ -91,3 +115,12 @@ class Base(object):
         if optname == 'adam':
             opt = tf.train.AdamOptimizer(learning_rate=lr, beta1=beta1, beta2=beta2, epsilon=epsilon, use_locking=False, name='Adam')
         return opt
+
+    def _verbosity(self, verbosity, log):
+        return{
+            '0': log.DEBUG,
+            '1': log.INFO,
+            '2': log.WARN,
+            '3': log.ERROR,
+            '4': log.FATAL,
+        }[verbosity]

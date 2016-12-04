@@ -7,21 +7,15 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 import time
-from core.history import History
-from core.lr_policy import PolyDecayPolicy
-from dataset.replay import ExperienceBuffer
 from models.ddpg_model import ActorModel, CriticModel
 from core.base import Base
 from utils import utils
 
 
 class SolverDDPG(Base):
-    def __init__(self, cfg, environment, sess, model_dir, lr_policy=PolyDecayPolicy(0.001), start_epoch=1, resume_lr=0.001, n_iters_per_epoch=100, gpu_memory_fraction=0.9):
-        super(SolverDDPG, self).__init__(cfg)
-        self.sess = sess
+    def __init__(self, cfg, environment, sess, model_dir, **kwargs):
         self.s_dim = environment.state_dim
         self.a_dim = environment.action_dim
-        self.weight_dir = 'weights'
         self.inputs_actor = tf.placeholder('float32', [None, self.s_dim], name='inputs_actor')
         self.target_inputs_actor = tf.placeholder('float32', [None, self.s_dim], name='target_inputs_actor')
         self.inputs_critic = tf.placeholder('float32', [None, self.s_dim], name='inputs_critic')
@@ -29,23 +23,8 @@ class SolverDDPG(Base):
         self.actions = tf.placeholder('float32', [None, self.a_dim], name='actions')
         self.target_actions = tf.placeholder('float32', [None, self.a_dim], name='target_actions')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
-        self.env = environment
-        self.history = History(self.cfg)
-        self.model_dir = model_dir
-        self.memory = ExperienceBuffer(self.cfg, self.model_dir)
-        self.learning_rate_minimum = 0.0001
-        self.double_q = True
         self.learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate_placeholder")
-        self.lr_policy = lr_policy
-        self.lr_policy.start_epoch = start_epoch
-        self.lr_policy.base_lr = resume_lr
-        self.lr_policy.n_iters_per_epoch = n_iters_per_epoch
-        self.gpu_memory_fraction = gpu_memory_fraction
-
-        with tf.variable_scope('step'):
-            self.step_op = tf.Variable(0, trainable=False, name='step')
-            self.step_input = tf.placeholder('int32', None, name='step_input')
-            self.step_assign_op = self.step_op.assign(self.step_input)
+        super(SolverDDPG, self).__init__(cfg, environment, sess, model_dir, **kwargs)
 
     def train(self):
         start_time = time.time()

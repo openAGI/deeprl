@@ -7,8 +7,6 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 import time
-from core.history import History
-from dataset.replay import ExperienceBuffer
 from models.custom_model import Model
 from core.base import Base
 from utils import utils
@@ -16,31 +14,16 @@ from core import logger
 
 
 class Solver(Base):
-    def __init__(self, cfg, environment, sess, model_dir, log_file_pathname='/tmp/deeprl.log'):
-        super(Solver, self).__init__(cfg)
-        self.sess = sess
-        self.weight_dir = 'weights'
+    def __init__(self, cfg, environment, sess, model_dir, double_q=True, **kwargs):
         self.inputs = tf.placeholder('float32', [None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='inputs')
         self.target_inputs = tf.placeholder('float32', [None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='target_inputs')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
         self.action = tf.placeholder('int64', [None], name='action')
-        self.env = environment
-        self.history = History(self.cfg)
-        self.model_dir = model_dir
-        self.memory = ExperienceBuffer(self.cfg, self.model_dir)
-        self.learning_rate_minimum = 0.0001
-        self.double_q = True
-        self.log_file_path = log_file_pathname
-
-        with tf.variable_scope('step'):
-            self.step_op = tf.Variable(0, trainable=False, name='step')
-            self.step_input = tf.placeholder('int32', None, name='step_input')
-            self.step_assign_op = self.step_op.assign(self.step_input)
+        self.double_q = double_q
+        super(Solver, self).__init__(cfg, environment, sess, model_dir, **kwargs)
 
     def train(self):
         start_time = time.time()
-        logger.setFileHandler(self.log_file_path)
-        logger.setVerbosity(logger.DEBUG)
 
         num_game, self.update_count, ep_reward = 0, 0, 0.
         total_reward, self.total_loss, self.total_q = 0., 0., 0.
@@ -65,6 +48,7 @@ class Solver(Base):
                 total_reward, self.total_loss, self.total_q = 0., 0., 0.
                 ep_rewards, actions = [], []
 
+            self.updated_lr = self.lr_policy.initial_lr
             ep = (self.cfg.ep_end + max(0., (self.cfg.ep_start - self.cfg.ep_end) * (self.cfg.ep_end_t - max(0., self.step - self.cfg.learn_start)) / self.cfg.ep_end_t))
             # 1. predict
             action = self.predict(self.end_points_q['pred_action'], self.history.get(), ep=ep)
@@ -160,7 +144,7 @@ class Solver(Base):
             self.target_q_t: target_q_t,
             self.action: action,
             self.inputs: s_t,
-            self.learning_rate_step: self.step})
+            self.learning_rate: self.updated_lr})
 
         # self.writer.add_summary(summary_str, self.step)
         self.total_loss += loss
@@ -180,12 +164,7 @@ class Solver(Base):
         clipped_delta = tf.clip_by_value(delta, self.cfg.min_delta, self.cfg.max_delta, name='clipped_delta')
 
         loss = tf.reduce_mean(tf.square(clipped_delta), name='loss')
-        self.learning_rate_step = tf.placeholder('int64', None, name='learning_rate_step')
-        learning_rate_op = tf.maximum(self.learning_rate_minimum, tf.train.exponential_decay(
-            self.cfg.TRAIN.learning_rate,
-            self.learning_rate_step,
-            self.cfg.TRAIN.learning_rate_decay_step,
-            self.cfg.TRAIN.learning_rate_decay,
-            staircase=True))
-        optim = tf.train.RMSPropOptimizer(learning_rate_op, momentum=0.95, epsilon=0.01).minimize(loss)
+        opt = self.optimizer(self.learning_rate, optname='rmsprop', decay=self.cfg.decay, momentum=self.cfg.momentum, epsilon=self.cfg.epsilon, beta1=self.cfg.beta1, beta2=self.cfg.beta2)
+        self.grads_and_vars = opt.compute_gradients(loss)
+        optim = opt.apply_gradients(self.grads_and_vars)
         return optim, loss, end_points_q, end_points_target_q
