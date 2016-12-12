@@ -24,7 +24,7 @@ class SolverDDPG(Base):
         self.target_actions = tf.placeholder('float32', [None, self.a_dim], name='target_actions')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
         self.learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate_placeholder")
-        super(SolverDDPG, self).__init__(cfg, environment, sess, model_dir, **kwargs)
+        super(SolverDDPG, self).__init__(cfg, environment, sess, model_dir, state='simple', state_dim=self.s_dim, **kwargs)
 
     def train(self):
         start_time = time.time()
@@ -34,23 +34,23 @@ class SolverDDPG(Base):
         max_avg_ep_reward = 0
         ep_rewards, actions = [], []
 
-        screen, reward, action, terminal = self.env.new_random_game()
+        screen, reward, action, terminal = self.env.new_game()
+
+        self.optim_actor, self.end_points_actor, self.end_points_target_actor = self.tower_loss_actor(self.inputs_actor, self.target_inputs_actor, actor_name='actor/main_')
+        self.optim_critic, self.loss_critic, self.end_points_critic, self.end_points_target_critic = self.tower_loss_critic(self.inputs_critic, self.target_inputs_critic, self.actions, self.target_actions, critic_name='critic/main_')
+        tvariables_actor = [var for var in tf.trainable_variables() if var.name.startswith('actor/')]
+        tvariables_critic = [var for var in tf.trainable_variables() if var.name.startswith('critic/')]
+        self.targetops_actor = self.update_target_graph(tvariables_actor, self.cfg.tau, main_name='actor/main_', target_name='actor/target_')
+        self.targetops_critic = self.update_target_graph(tvariables_critic, self.cfg.tau, main_name='critic/main_', target_name='critic/target_')
+        self.saver = tf.train.Saver(max_to_keep=None)
+        init = tf.initialize_all_variables()
+        self.sess.run(init)
+        start_step = self.step_op.eval()
+
         i = np.random.randint(11)
         j = np.random.randint(19)
         first_input = np.reshape(screen, (1, 3)) + (1. / (1. + i + j))
         action = self.predict(self.end_points_actor['scaled_out'], first_input, agent_type='actor')
-
-        self.optim_actor, self.loss_actor, self.end_points_actor, self.end_points_target_actor = self.tower_loss_actor(self.actor_inputs, self.actor_target_inputs, actor_name='actor/main_')
-        self.optim_critic, self.loss_critic, self.end_points_critic, self.end_points_target_critic = self.tower_loss_critic(self.critic_inputs, self.critic_target_inputs, self.actions, self.target_actions, critic_name='critic/main_')
-        tvariables_actor = [var for var in tf.trainable_variables() if var.name.startswith('actor/')]
-        tvariables_critic = [var for var in tf.trainable_variables() if var.name.startswith('critic/')]
-        self.targetops_actor = self.update_target_graph(tvariables_actor, self.cfg.tau, main_name='actor/main_', target_name='critic/target')
-        self.targetops_critic = self.update_target_graph(tvariables_critic, self.cfg.tau, main_name='critic/main_', target_name='critic/target_')
-        self.saver = tf.train.Saver(max_to_keep=None)
-
-        init = tf.initialize_all_variables()
-        self.sess.run(init)
-        start_step = self.step_op.eval()
 
         for _ in range(self.cfg.history_length):
             self.history.add(screen)
@@ -133,19 +133,19 @@ class SolverDDPG(Base):
         if self.memory.count < self.cfg.history_length:
             return
         else:
-            s_t, action, reward, s_t_plus_1, terminal = self.memory.sample()
-
+            s_t, action, reward, s_t_plus_1, terminal = self.memory.sample_simple()
+        print(action.shape)
         ep = (self.cfg.ep_end + max(0., (self.cfg.ep_start - self.cfg.ep_end) * (self.cfg.ep_end_t - max(0., self.step - self.cfg.learn_start)) / self.cfg.ep_end_t))
         action_s_t_plus_1 = self.predict_target(self.end_points_target_actor['scaled_out'], s_t_plus_1, ep=ep, agent_type='actor')
-        target_q = self.end_points_target_critic['out'].eval({self.target_inputs: s_t_plus_1, self.target_actions: action_s_t_plus_1})
+        target_q = self.end_points_target_critic['out'].eval({self.target_inputs_critic: s_t_plus_1, self.target_actions: action_s_t_plus_1})
 
         terminal = np.array(terminal) + 0.
         target_q_t = (1. - terminal) * self.cfg.discount * target_q + reward
 
-        _, q_t, loss = self.sess.run([self.optim_critic, self.end_points_critic['out'], self.loss], {
+        _, q_t, loss = self.sess.run([self.optim_critic, self.end_points_critic['out'], self.loss_critic], {
             self.predicted_q_value: target_q_t,
             self.actions: action,
-            self.critic_inputs: s_t,
+            self.inputs_critic: s_t,
             self.learning_rate: self.updated_lr})
         action_out = self.predict(self.end_points_actor['scaled_out'], s_t, ep=ep, agent_type='actor')
         a_grads = self.sess.run(self.action_gradients, {self.critic_inputs: s_t, self.actions: action_out})
@@ -158,32 +158,32 @@ class SolverDDPG(Base):
 
     def tower_loss_actor(self, inputs, target_inputs, actor_name='actor/main_'):
         model_actor = ActorModel()
-        model_target_actor = ActorModel(is_target_q=True)
-        end_points_actor = model_actor.model_def(inputs, self.env, name='main')
+        model_target_actor = ActorModel()
+        end_points_actor = model_actor.model_def(inputs, self.env, name='main_')
         # Target Network
-        end_points_target_actor = model_target_actor.model_def(target_inputs, self.env, name='target')
+        end_points_target_actor = model_target_actor.model_def(target_inputs, self.env, name='target_')
         # This gradient will be provided by the critic network
         self.action_gradients = tf.placeholder(tf.float32, [None, self.a_dim])
         # Combine the gradients here
         self.actor_model_params = [var for var in tf.trainable_variables() if var.name.startswith(actor_name)]
         self.actor_gradients = tf.gradients(end_points_actor['scaled_out'], self.actor_model_params, -self.action_gradients)
         # Optimization Op
-        opt = self.optimizer(self.learning_rate, optname=self.cfg.optname, decay=self.cfg.decay, momentum=self.cfg.momentum, epsilon=self.cfg.epsilon, beta1=self.cfg.beta1, beta2=self.cfg.beta2)
+        opt = self.optimizer(self.learning_rate, optname=self.cfg.TRAIN.optname)
 
         optim = opt.apply_gradients(zip(self.actor_gradients, self.actor_model_params))
         return optim, end_points_actor, end_points_target_actor
 
     def tower_loss_critic(self, inputs, target_inputs, actions, target_actions, critic_name='critic/main_'):
         model_critic = CriticModel()
-        model_target_critic = CriticModel(is_target_q=True)
-        end_points_critic = model_critic.model_def(inputs, actions, name='main')
+        model_target_critic = CriticModel()
+        end_points_critic = model_critic.model_def(inputs, actions, name='main_')
         # Target Network
-        end_points_target_critic = model_target_critic.model_def(target_inputs, target_actions, self.env, name='target')
+        end_points_target_critic = model_target_critic.model_def(target_inputs, target_actions, self.env, name='target_')
         # This gradient will be provided by the critic network
         self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
-        loss = tf.reduce_mean(tf.square(self.predicted_q_value, end_points_critic['out']))
+        loss = tf.reduce_mean(tf.square(self.predicted_q_value - end_points_critic['out']))
         # Optimization Op
-        opt = self.optimizer(self.learning_rate, optname=self.cfg.optname, decay=self.cfg.decay, momentum=self.cfg.momentum, epsilon=self.cfg.epsilon, beta1=self.cfg.beta1, beta2=self.cfg.beta2)
+        opt = self.optimizer(self.learning_rate, optname=self.cfg.TRAIN.optname)
         self.critic_model_params = [var for var in tf.trainable_variables() if var.name.startswith(critic_name)]
         self.critic_gradients_vars = opt.compute_gradients(loss, self.critic_model_params)
         optim = opt.apply_gradients(self.critic_gradients_vars)

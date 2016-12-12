@@ -5,6 +5,7 @@
 # -------------------------------------------------------------------#
 import tensorflow as tf
 import random
+import numpy as np
 from core.history import History
 from core.lr_policy import PolyDecayPolicy
 from dataset.replay import ExperienceBuffer
@@ -13,14 +14,14 @@ from utils import utils
 
 
 class Base(object):
-    def __init__(self, cfg, environment, sess, model_dir, log_file_pathname='/tmp/deeprl.log', verbosity=0, lr_policy=PolyDecayPolicy(0.001), start_epoch=1, resume_lr=0.001, n_iters_per_epoch=100, gpu_memory_fraction=0.9):
+    def __init__(self, cfg, environment, sess, model_dir, state='image', state_dim=3, log_file_pathname='/tmp/deeprl.log', verbosity=0, lr_policy=PolyDecayPolicy(0.001), start_epoch=1, resume_lr=0.001, n_iters_per_epoch=100, gpu_memory_fraction=0.9):
         self.cfg = cfg
         self.sess = sess
         self.weight_dir = 'weights'
         self.env = environment
-        self.history = History(self.cfg)
+        self.history = History(self.cfg, state=state, state_dim=state_dim)
         self.model_dir = model_dir
-        self.memory = ExperienceBuffer(self.cfg, self.model_dir)
+        self.memory = ExperienceBuffer(self.cfg, self.model_dir, state=state, state_dim=state_dim)
         self.learning_rate_minimum = 0.0001
         self.learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate_placeholder")
         self.lr_policy = lr_policy
@@ -28,8 +29,8 @@ class Base(object):
         self.lr_policy.base_lr = resume_lr
         self.lr_policy.n_iters_per_epoch = n_iters_per_epoch
         self.gpu_memory_fraction = gpu_memory_fraction
-        log.setFIleHandler(log_file_pathname)
-        log.setVerbosity(self._verbosity(verbosity, log))
+        log.setFileHandler(log_file_pathname)
+        log.setVerbosity(self._verbosity(str(verbosity), log))
 
         with tf.variable_scope('step'):
             self.step_op = tf.Variable(0, trainable=False, name='step')
@@ -44,15 +45,16 @@ class Base(object):
                 action = pred_action_op.eval({self.inputs: [s_t]})[0]
         elif agent_type == 'actor':
             if random.random() < ep:
-                action = random.randrange(self.env.action_size)
+                action = random.randrange(self.env.action_dim)
             else:
-                action = pred_action_op.eval({self.actor_inputs: [s_t]})[0]
+                action = pred_action_op.eval({self.inputs_actor: s_t})[0]
         elif agent_type == 'critic':
             if random.random() < ep:
-                action = random.randrange(self.env.action_size)
+                action = random.randrange(self.env.action_dim)
             else:
-                action = pred_action_op.eval({self.critic_inputs: [s_t]})[0]
+                action = pred_action_op.eval({self.inputs_critic: s_t})[0]
 
+        action = np.clip(action, self.env.action_low, self.env.action_high)
         return action
 
     def predict_target(self, pred_action_op, s_t, ep=0.1, agent_type=None):
@@ -62,16 +64,14 @@ class Base(object):
             else:
                 action = pred_action_op.eval({self.target_inputs: [s_t]})[0]
         elif agent_type == 'actor':
-            if random.random() < ep:
-                action = random.randrange(self.env.action_size)
-            else:
-                action = pred_action_op.eval({self.actor_target_inputs: [s_t]})[0]
+            action = pred_action_op.eval({self.target_inputs_actor: s_t})
         elif agent_type == 'critic':
             if random.random() < ep:
-                action = random.randrange(self.env.action_size)
+                action = random.randrange(self.env.action_dim)
             else:
-                action = pred_action_op.eval({self.critic_target_inputs: [s_t]})[0]
+                action = pred_action_op.eval({self.target_inputs_critic: s_t})[0]
 
+        action = np.clip(action, self.env.action_low, self.env.action_high)
         return action
 
     def update_target_graph(self, tfVars, tau, main_name='main_q', target_name='target_q'):

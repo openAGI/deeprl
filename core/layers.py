@@ -53,7 +53,10 @@ def fully_connected(x, n_output, is_training, reuse, trainable=True, w_init=init
             output = batch_norm(output, is_training=is_training, reuse=reuse, trainable=trainable, **batch_norm_args)
 
         if activation:
-            output = activation(output, reuse=reuse, trainable=trainable)
+            try:
+                output = activation(output, reuse=reuse, trainable=trainable)
+            except:
+                output = activation(output)
     output.W = W
     if use_bias:
         output.b = b
