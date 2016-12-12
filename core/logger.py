@@ -15,7 +15,7 @@ from logging import INFO
 from logging import WARN
 
 
-__all_ = ['setFileHandler', 'vlog', 'setVerbosity', 'getVerbosity', 'debug', 'info', 'warn', 'error', 'fatal']
+__all__ = ['setFileHandler', 'vlog', 'setVerbosity', 'getVerbosity', 'debug', 'info', 'warn', 'error', 'fatal']
 
 _logger = _logging.getLogger('deeprl')
 
