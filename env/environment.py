@@ -38,7 +38,10 @@ class Environment(object):
         except AttributeError:
             self._screen = self.env.reset()
             self.render()
-        return self.screen, 0, 0, self.terminal
+        try:
+            return self.screen, 0, 0, self.terminal
+        except:
+            return self._screen, 0, 0, self.terminal
 
     def new_random_game(self):
         self.new_game(True)
@@ -46,6 +49,13 @@ class Environment(object):
             self._step(0)
         self.render()
         return self.screen, 0, 0, self.terminal
+
+    def new_state_game(self):
+        self.new_game(True)
+        for _ in xrange(random.randint(0, self.random_start - 1)):
+            self._step(0)
+        self.render()
+        return self._screen, 0, 0, self.terminal
 
     def _step(self, action):
         self._screen, self.reward, self.terminal, _ = self.env.step(action)
@@ -65,6 +75,14 @@ class Environment(object):
         return self.env.action_space.n
 
     @property
+    def action_low(self):
+        return self.env.action_space.low
+
+    @property
+    def action_high(self):
+        return self.env.action_space.high
+
+    @property
     def action_dim(self):
         return self.env.action_space.shape[0]
 
@@ -82,7 +100,10 @@ class Environment(object):
 
     @property
     def state(self):
-        return self.screen, self.reward, self.terminal
+        try:
+            return self.screen, self.reward, self.terminal
+        except:
+            return self._screen, self.reward, self.terminal
 
     def render(self):
         if self.display:

@@ -9,7 +9,7 @@ import random
 
 class ExperienceBuffer():
 
-    def __init__(self, cfg, model_dir):
+    def __init__(self, cfg, model_dir, state='image', state_dim=3):
         self.model_dir = model_dir
         self.buffer = []
         self.buffer_size = cfg.TRAIN.buffer_size
@@ -17,17 +17,23 @@ class ExperienceBuffer():
         self.cnn_format = cfg.cnn_format
         self.actions = np.empty(self.buffer_size, dtype=np.uint8)
         self.rewards = np.empty(self.buffer_size, dtype=np.integer)
-        self.screens = np.empty((self.buffer_size, cfg.screen_height, cfg.screen_width), dtype=np.float16)
         self.terminals = np.empty(self.buffer_size, dtype=np.bool)
         self.history_length = cfg.history_length
-        self.dims = (cfg.screen_height, cfg.screen_width)
         self.batch_size = cfg.batch_size
         self.count = 0
         self.current = 0
+        if state == 'image':
+            self.screens = np.empty((self.buffer_size, cfg.screen_height, cfg.screen_width), dtype=np.float16)
+            self.dims = (cfg.screen_height, cfg.screen_width)
+            self.prestates = np.empty((self.batch_size, self.history_length) + self.dims, dtype=np.float16)
+            self.poststates = np.empty((self.batch_size, self.history_length) + self.dims, dtype=np.float16)
+        else:
+            self.screens = np.empty((self.buffer_size, state_dim), dtype=np.float16)
+            self.dims = (state_dim, )
+            self.prestates = np.empty((self.batch_size, ) + self.dims, dtype=np.float16)
+            self.poststates = np.empty((self.batch_size, ) + self.dims, dtype=np.float16)
 
         # pre-allocate prestates and poststates for minibatch
-        self.prestates = np.empty((self.batch_size, self.history_length) + self.dims, dtype=np.float16)
-        self.poststates = np.empty((self.batch_size, self.history_length) + self.dims, dtype=np.float16)
 
     def add(self, screen, reward, action, terminal):
         assert screen.shape == self.dims
@@ -79,7 +85,47 @@ class ExperienceBuffer():
             rewards = self.rewards[indexes]
             terminals = self.terminals[indexes]
 
-            return np.transpose(self.prestates, (0, 2, 3, 1)), actions, rewards, np.transpose(self.poststates, (0, 2, 3, 1)), terminals
+            try:
+                return np.transpose(self.prestates, (0, 2, 3, 1)), actions, rewards, np.transpose(self.poststates, (0, 2, 3, 1)), terminals
+            except:
+                return np.transpose(self.prestates, (0, 1)), actions, rewards, np.transpose(self.poststates, (0, 1)), terminals
+
+    def getState_simple(self, index):
+        assert self.count > 0, "replay buffer is empy, use at least --random_steps 1"
+        # normalize index to expected range, allows negative indexes
+        index = index % self.count
+        # otherwise normalize indexes and use slower list based access
+        indexes = [(index) % self.count]
+        return self.screens[indexes, ...]
+
+    def sample_simple(self):
+        # buffer must include poststate, prestate and history
+        indexes = []
+        while len(indexes) < self.batch_size:
+            # find random index
+            while True:
+                # sample one index (ignore states wraping over
+                index = random.randint(1, self.count - 1)
+                # if wraps over current pointer, then get new one
+                if index >= self.current:
+                    continue
+                # if wraps over episode end, then get new one
+                # NB! poststate (last screen) can be terminal state!
+                if self.terminals[(index):index].any():
+                    continue
+                # otherwise use this index
+                break
+            # NB! having index first is fastest in C-order matrices
+            self.prestates[len(indexes), ...] = self.getState_simple(index - 1)
+            self.poststates[len(indexes), ...] = self.getState_simple(index)
+            indexes.append(index)
+
+            actions = self.actions[indexes]
+            rewards = self.rewards[indexes]
+            terminals = self.terminals[indexes]
+            print(actions)
+
+            return np.transpose(self.prestates, (0, 1)), np.reshape(actions, (self.batch_size, 1)), rewards, np.transpose(self.poststates, (0, 1)), terminals
 
     def add_experience(self, experience):
         if len(self.buffer) + len(experience) >= self.buffer_size:
