@@ -27,4 +27,4 @@ class History:
         if self.state == 'image':
             return np.transpose(self.history, (1, 2, 0))
         else:
-            return np.transpose(self.history, (1, 0))
+            return self.history

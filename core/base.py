@@ -37,17 +37,18 @@ class Base(object):
             self.step_input = tf.placeholder('int32', None, name='step_input')
             self.step_assign_op = self.step_op.assign(self.step_input)
 
-    def predict(self, pred_action_op, s_t, ep=0.1, agent_type=None):
+    def predict(self, pred_action_op, s_t, ep=0.1, agent_type=None, batch_size=32, is_train_loop=False):
         if agent_type is None:
             if random.random() < ep:
                 action = random.randrange(self.env.action_size)
             else:
                 action = pred_action_op.eval({self.inputs: [s_t]})[0]
         elif agent_type == 'actor':
-            if random.random() < ep:
+            if random.random() < ep and not is_train_loop:
                 action = random.randrange(self.env.action_dim)
+                # action = np.reshape(np.array([random.randrange(self.env.action_dim) for i in xrange(0, batch_size)]), (batch_size, self.env.action_dim))
             else:
-                action = pred_action_op.eval({self.inputs_actor: s_t})[0]
+                action = pred_action_op.eval({self.inputs_actor: s_t})
         elif agent_type == 'critic':
             if random.random() < ep:
                 action = random.randrange(self.env.action_dim)
@@ -64,7 +65,7 @@ class Base(object):
             else:
                 action = pred_action_op.eval({self.target_inputs: [s_t]})[0]
         elif agent_type == 'actor':
-            action = pred_action_op.eval({self.target_inputs_actor: s_t})
+                action = pred_action_op.eval({self.target_inputs_actor: s_t})
         elif agent_type == 'critic':
             if random.random() < ep:
                 action = random.randrange(self.env.action_dim)

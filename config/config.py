@@ -29,6 +29,7 @@ __C.TRAIN.learning_rate_decay = 0.96
 __C.TRAIN.learning_rate_decay_step = 5 * __C.scale
 __C.TRAIN.buffer_size = 50000
 
+__C.TRAIN.optname='rmsprop'
 __C.ep_test = 0.01
 __C.ep_end = 0.1
 __C.ep_start = 1.

@@ -23,7 +23,7 @@ class SolverDDPG(Base):
         self.actions = tf.placeholder('float32', [None, self.a_dim], name='actions')
         self.target_actions = tf.placeholder('float32', [None, self.a_dim], name='target_actions')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
-        self.learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate_placeholder")
+        self.learning_rate = tf.placeholder('float32', shape=[], name="learning_rate_placeholder")
         super(SolverDDPG, self).__init__(cfg, environment, sess, model_dir, state='simple', state_dim=self.s_dim, **kwargs)
 
     def train(self):
@@ -68,7 +68,7 @@ class SolverDDPG(Base):
             # 2. act
             screen, reward, terminal = self.env.act(action, is_training=True)
             # 3. observe
-            self.observe(np.reshape(screen, self.s_dim), reward, np.reshape(action, self.a_dim), terminal)
+            self.observe(np.reshape(screen, self.s_dim), reward, np.reshape(action[0], self.a_dim), terminal)
 
             if terminal:
                 screen, reward, action, terminal = self.env.new_random_game()
@@ -134,22 +134,26 @@ class SolverDDPG(Base):
             return
         else:
             s_t, action, reward, s_t_plus_1, terminal = self.memory.sample_simple()
-        print(action.shape)
+
         ep = (self.cfg.ep_end + max(0., (self.cfg.ep_start - self.cfg.ep_end) * (self.cfg.ep_end_t - max(0., self.step - self.cfg.learn_start)) / self.cfg.ep_end_t))
         action_s_t_plus_1 = self.predict_target(self.end_points_target_actor['scaled_out'], s_t_plus_1, ep=ep, agent_type='actor')
         target_q = self.end_points_target_critic['out'].eval({self.target_inputs_critic: s_t_plus_1, self.target_actions: action_s_t_plus_1})
 
         terminal = np.array(terminal) + 0.
-        target_q_t = (1. - terminal) * self.cfg.discount * target_q + reward
+        reward = np.reshape(np.array(reward), (32, 1))
+        # target_q_t = (1. - terminal) * self.cfg.discount * target_q + reward
+        target_q_t = self.cfg.discount * target_q + reward
 
         _, q_t, loss = self.sess.run([self.optim_critic, self.end_points_critic['out'], self.loss_critic], {
             self.predicted_q_value: target_q_t,
             self.actions: action,
             self.inputs_critic: s_t,
             self.learning_rate: self.updated_lr})
-        action_out = self.predict(self.end_points_actor['scaled_out'], s_t, ep=ep, agent_type='actor')
-        a_grads = self.sess.run(self.action_gradients, {self.critic_inputs: s_t, self.actions: action_out})
-        _, = self.sess.run(self.optim_actor, {self.actor_inputs: s_t, self.action_gradients: a_grads[0]})
+        action_out = self.predict(self.end_points_actor['scaled_out'], s_t, ep=ep, agent_type='actor', is_train_loop=True)
+        s_t = np.asarray(s_t, np.float32)
+        action_out = np.asarray(action_out, np.float32)
+        a_grads = self.sess.run(self.action_grads, {self.inputs_critic: s_t, self.actions: action_out})
+        tmpp = self.sess.run(self.optim_actor, {self.inputs_actor: s_t, self.action_gradients: a_grads[0], self.learning_rate: self.updated_lr})
 
         # self.writer.add_summary(summary_str, self.step)
         self.total_loss += loss

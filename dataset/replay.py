@@ -120,12 +120,11 @@ class ExperienceBuffer():
             self.poststates[len(indexes), ...] = self.getState_simple(index)
             indexes.append(index)
 
-            actions = self.actions[indexes]
-            rewards = self.rewards[indexes]
-            terminals = self.terminals[indexes]
-            print(actions)
+        actions = self.actions[indexes]
+        rewards = self.rewards[indexes]
+        terminals = self.terminals[indexes]
 
-            return np.transpose(self.prestates, (0, 1)), np.reshape(actions, (self.batch_size, 1)), rewards, np.transpose(self.poststates, (0, 1)), terminals
+        return np.transpose(self.prestates, (0, 1)), np.reshape(actions, (self.batch_size, 1)), rewards, np.transpose(self.poststates, (0, 1)), terminals
 
     def add_experience(self, experience):
         if len(self.buffer) + len(experience) >= self.buffer_size:
