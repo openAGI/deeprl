@@ -14,11 +14,14 @@ from utils import utils
 
 
 class Player(Base):
+
     def __init__(self, cfg, environment, sess, model_dir):
         super(Player, self).__init__(cfg)
         self.sess = sess
-        self.inputs = tf.placeholder('float32', [None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='inputs')
-        self.target_inputs = tf.placeholder('float32', [None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='target_inputs')
+        self.inputs = tf.placeholder('float32', [
+                                     None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='inputs')
+        self.target_inputs = tf.placeholder('float32', [
+                                            None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='target_inputs')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
         self.action = tf.placeholder('int64', [None], name='action')
         self.env = environment
@@ -32,9 +35,10 @@ class Player(Base):
         model_q = Model()
         model_target_q = Model(is_target_q=True)
         end_points_q = model_q.model_def(self.inputs, self.env, name='main_q')
-        _ = model_target_q.model_def(self.target_inputs, self.env, name='target_q')
+        _ = model_target_q.model_def(
+            self.target_inputs, self.env, name='target_q')
 
-        init = tf.initialize_all_variables()
+        init = tf.global_variables_initializer()
         self.saver = tf.train.Saver(max_to_keep=None)
 
         if load_model:
@@ -59,9 +63,11 @@ class Player(Base):
 
             for t in tqdm(xrange(num_step), ncols=70):
                 # 1. predict
-                action = self.predict(end_points_q['pred_action'], self.history.get(), ep=test_ep)
+                action = self.predict(
+                    end_points_q['pred_action'], self.history.get(), ep=test_ep)
                 # 2. act
-                screen, reward, terminal = self.env.act(action, is_training=False)
+                screen, reward, terminal = self.env.act(
+                    action, is_training=False)
                 # 3. observe
                 self.history.add(screen)
 
