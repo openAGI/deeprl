@@ -5,7 +5,11 @@
 2. Easy to implement deeprl models
 3. trainer class
 
-
+## Implementation
+   1. Actor Critic DDPG
+   2. Q value 
+   3. Double Q value\
+   4. Simple Poly gradient
  
 # Requirements
     1. Tensorflow
