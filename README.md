@@ -8,8 +8,8 @@
 ## Implementation
    1. Actor Critic DDPG
    2. Q value 
-   3. Double Q value\
-   4. Simple Poly gradient
+   3. Double Q value
+   4. Simple Policy gradient
  
 # Requirements
     1. Tensorflow
