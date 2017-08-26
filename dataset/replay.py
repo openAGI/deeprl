@@ -4,12 +4,13 @@
 # Enhancement Copyright 2016, Mrinal Haloi
 # -------------------------------------------------------------------#
 import numpy as np
+import cv2
 import random
 
 
 class ExperienceBuffer():
 
-    def __init__(self, cfg, model_dir, state='image', state_dim=3):
+    def __init__(self, cfg, model_dir, log=None, state='image', state_dim=3):
         self.model_dir = model_dir
         self.buffer = []
         self.buffer_size = cfg.TRAIN.buffer_size
@@ -22,25 +23,42 @@ class ExperienceBuffer():
         self.batch_size = cfg.batch_size
         self.count = 0
         self.current = 0
+        self.state = state
+        self.cfg = cfg
+        self.log = log
         if state == 'image':
-            self.screens = np.empty((self.buffer_size, cfg.screen_height, cfg.screen_width), dtype=np.float16)
+            self.screens = np.empty(
+                (self.buffer_size, cfg.screen_height, cfg.screen_width), dtype=np.float16)
             self.dims = (cfg.screen_height, cfg.screen_width)
-            self.prestates = np.empty((self.batch_size, self.history_length) + self.dims, dtype=np.float16)
-            self.poststates = np.empty((self.batch_size, self.history_length) + self.dims, dtype=np.float16)
+            self.prestates = np.empty(
+                (self.batch_size, self.history_length) + self.dims, dtype=np.float16)
+            self.poststates = np.empty(
+                (self.batch_size, self.history_length) + self.dims, dtype=np.float16)
         else:
-            self.screens = np.empty((self.buffer_size, state_dim), dtype=np.float16)
+            self.screens = np.empty(
+                (self.buffer_size, state_dim), dtype=np.float16)
             self.dims = (state_dim, )
-            self.prestates = np.empty((self.batch_size, ) + self.dims, dtype=np.float16)
-            self.poststates = np.empty((self.batch_size, ) + self.dims, dtype=np.float16)
+            self.prestates = np.empty(
+                (self.batch_size, ) + self.dims, dtype=np.float16)
+            self.poststates = np.empty(
+                (self.batch_size, ) + self.dims, dtype=np.float16)
 
         # pre-allocate prestates and poststates for minibatch
 
     def add(self, screen, reward, action, terminal):
+        if self.state == 'image':
+            screen = cv2.resize(
+                screen, (self.cfg.screen_width, self.cfg.screen_height))
+            try:
+                self.screens[self.current, ...] = screen
+            except Exception:
+                screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
+                self.screens[self.current, ...] = screen
+                self.log.debug('Converting to Gray image')
         assert screen.shape == self.dims
         # NB! screen is post-state, after action and reward
         self.actions[self.current] = action
         self.rewards[self.current] = reward
-        self.screens[self.current, ...] = screen
         self.terminals[self.current] = terminal
         self.count = max(self.count, self.current + 1)
         self.current = (self.current + 1) % self.buffer_size
@@ -54,7 +72,8 @@ class ExperienceBuffer():
             return self.screens[(index - (self.history_length - 1)):(index + 1), ...]
         else:
             # otherwise normalize indexes and use slower list based access
-            indexes = [(index - i) % self.count for i in reversed(range(self.history_length))]
+            indexes = [(index - i) %
+                       self.count for i in reversed(range(self.history_length))]
             return self.screens[indexes, ...]
 
     def sample(self):
@@ -128,7 +147,8 @@ class ExperienceBuffer():
 
     def add_experience(self, experience):
         if len(self.buffer) + len(experience) >= self.buffer_size:
-            self.buffer[0:(len(experience) + len(self.buffer)) - self.buffer_size] = []
+            self.buffer[0:(len(experience) + len(self.buffer)) -
+                        self.buffer_size] = []
         self.buffer.extend(experience)
 
     def sample_experience(self, size):
