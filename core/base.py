@@ -20,10 +20,11 @@ class Base(object):
         self.sess = sess
         self.weight_dir = 'weights'
         self.env = environment
-        self.history = History(self.cfg, state=state, state_dim=state_dim)
+        self.history = History(
+            self.cfg, log=log, state=state, state_dim=state_dim)
         self.model_dir = model_dir
         self.memory = ExperienceBuffer(
-            self.cfg, self.model_dir, state=state, state_dim=state_dim)
+            self.cfg, self.model_dir, log=log, state=state, state_dim=state_dim)
         self.learning_rate_minimum = 0.0001
         self.learning_rate = tf.placeholder(
             tf.float32, shape=[], name="learning_rate_placeholder")

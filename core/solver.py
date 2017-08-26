@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------#
 # Released under the MIT license (https://opensource.org/licenses/MIT)
 # Contact: mrinal.haloi11@gmail.com
-# Copyright 2016, Mrinal Haloi
+# Copyright 2017, Mrinal Haloi
 # -------------------------------------------------------------------#
 import tensorflow as tf
 import numpy as np
@@ -17,9 +17,9 @@ class Solver(Base):
 
     def __init__(self, cfg, environment, sess, model_dir, double_q=True, **kwargs):
         self.inputs = tf.placeholder('float32', [
-                                     None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='inputs')
+                                     None, cfg.screen_height, cfg.screen_width, cfg.history_length], name='inputs')
         self.target_inputs = tf.placeholder('float32', [
-                                            None, self.cfg.screen_height, self.cfg.screen_width, self.cfg.history_length], name='target_inputs')
+                                            None, cfg.screen_height, cfg.screen_width, cfg.history_length], name='target_inputs')
         self.target_q_t = tf.placeholder('float32', [None], name='target_q_t')
         self.action = tf.placeholder('int64', [None], name='action')
         self.double_q = double_q
@@ -186,8 +186,8 @@ class Solver(Base):
             delta, self.cfg.min_delta, self.cfg.max_delta, name='clipped_delta')
 
         loss = tf.reduce_mean(tf.square(clipped_delta), name='loss')
-        opt = self.optimizer(self.learning_rate, optname='rmsprop', decay=self.cfg.decay,
-                             momentum=self.cfg.momentum, epsilon=self.cfg.epsilon, beta1=self.cfg.beta1, beta2=self.cfg.beta2)
+        opt = self.optimizer(self.learning_rate, optname='rmsprop', decay=self.cfg.TRAIN.rmsprop_decay,
+                             momentum=self.cfg.TRAIN.rmsprop_momentum, epsilon=self.cfg.TRAIN.rmsprop_epsilon, beta1=self.cfg.TRAIN.rmsprop_beta1, beta2=self.cfg.TRAIN.rmsprop_beta2)
         self.grads_and_vars = opt.compute_gradients(loss)
         optim = opt.apply_gradients(self.grads_and_vars)
         return optim, loss, end_points_q, end_points_target_q
