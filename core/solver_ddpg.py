@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------#
 # Released under the MIT license (https://opensource.org/licenses/MIT)
 # Contact: mrinal.haloi11@gmail.com
-# Enhancement Copyright 2016, Mrinal Haloi
+# Enhancement Copyright 2017, Mrinal Haloi
 # -------------------------------------------------------------------#
 import tensorflow as tf
 import numpy as np
@@ -10,6 +10,7 @@ import time
 from models.ddpg_model import ActorModel, CriticModel
 from core.base import Base
 from utils import utils
+import core.logger as log
 
 
 class SolverDDPG(Base):
@@ -114,8 +115,8 @@ class SolverDDPG(Base):
                     except:
                         max_ep_reward, min_ep_reward, avg_ep_reward = 0, 0, 0
 
-                    print '\navg_r: %.4f, avg_l: %.6f, avg_q: %3.6f, avg_ep_r: %.4f, max_ep_r: %.4f, min_ep_r: %.4f, # game: %d' \
-                        % (avg_reward, avg_loss, avg_q, avg_ep_reward, max_ep_reward, min_ep_reward, num_game)
+                    log.info('\navg_r: %.4f, avg_l: %.6f, avg_q: %3.6f, avg_ep_r: %.4f, max_ep_r: %.4f, min_ep_r: %.4f, # game: %d'
+                             % (avg_reward, avg_loss, avg_q, avg_ep_reward, max_ep_reward, min_ep_reward, num_game))
 
                     if max_avg_ep_reward * 0.9 <= avg_ep_reward:
                         self.step_assign_op.eval(
@@ -135,7 +136,7 @@ class SolverDDPG(Base):
                     ep_rewards = []
                     actions = []
         end_time = time.time()
-        print('Total training time %6.1fs' % start_time - end_time)
+        log.info('Total training time %6.1fs' % start_time - end_time)
 
     def observe(self, screen, reward, action, terminal):
         reward = max(self.cfg.min_reward, min(self.cfg.max_reward, reward))
