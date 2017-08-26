@@ -1,6 +1,7 @@
 import gym
+from tqdm import tqdm
 import matplotlib.pyplot as plt
-from core.pg_solver import VanillaPolicyGradient, tf
+from core.solver_pg import VanillaPolicyGradient, tf
 import core.logger as log
 
 
@@ -30,7 +31,7 @@ def main():
             reward_decay=0.99,
         )
 
-        for i_episode in range(3000):
+        for i_episode in tqdm(range(0, 3000), ncols=70, initial=0):
 
             observation = env.reset()
 
