@@ -17,6 +17,7 @@ except:
 
 
 class Environment(object):
+
     def __init__(self, cfg):
         self.env = gym.make(cfg.env_name)
 
@@ -45,15 +46,21 @@ class Environment(object):
 
     def new_random_game(self):
         self.new_game(True)
-        for _ in xrange(random.randint(0, self.random_start - 1)):
-            self._step([_])
+        try:
+            for _ in xrange(random.randint(0, self.random_start - 1)):
+                self._step([_])
+        except Exception:
+            self._step([0])
         self.render()
         return self._screen, 0, 0, self.terminal
 
     def new_state_game(self):
         self.new_game(True)
-        for _ in xrange(random.randint(0, self.random_start - 1)):
-            self._step([_])
+        try:
+            for _ in xrange(random.randint(0, self.random_start - 1)):
+                self._step([_])
+        except Exception:
+            self._step([0])
         self.render()
         return self._screen, 0, 0, self.terminal
 
@@ -77,11 +84,17 @@ class Environment(object):
 
     @property
     def action_low(self):
-        return self.env.action_space.low
+        try:
+            return self.env.action_space.low
+        except Exception:
+            return 0
 
     @property
     def action_high(self):
-        return self.env.action_space.high
+        try:
+            return self.env.action_space.high
+        except Exception:
+            return 4
 
     @property
     def action_dim(self):
@@ -97,7 +110,10 @@ class Environment(object):
 
     @property
     def lives(self):
-        return self.env.ale.lives()
+        try:
+            return self.env.ale.lives()
+        except Exception:
+            return 0
 
     @property
     def state(self):
@@ -115,12 +131,16 @@ class Environment(object):
 
 
 class GymEnvironment(Environment):
+
     def __init__(self, cfg):
         super(GymEnvironment, self).__init__(cfg)
 
     def act(self, action, is_training=True):
         cumulated_reward = 0
-        start_lives = self.lives
+        try:
+            start_lives = self.lives
+        except Exception:
+            start_lives = 0
 
         for _ in xrange(self.action_repeat):
             self._step(action)
@@ -140,6 +160,7 @@ class GymEnvironment(Environment):
 
 
 class SimpleGymEnvironment(Environment):
+
     def __init__(self, cfg):
         super(SimpleGymEnvironment, self).__init__(cfg)
 
