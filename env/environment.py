@@ -46,14 +46,14 @@ class Environment(object):
     def new_random_game(self):
         self.new_game(True)
         for _ in xrange(random.randint(0, self.random_start - 1)):
-            self._step(0)
+            self._step([_])
         self.render()
-        return self.screen, 0, 0, self.terminal
+        return self._screen, 0, 0, self.terminal
 
     def new_state_game(self):
         self.new_game(True)
         for _ in xrange(random.randint(0, self.random_start - 1)):
-            self._step(0)
+            self._step([_])
         self.render()
         return self._screen, 0, 0, self.terminal
 
@@ -66,7 +66,8 @@ class Environment(object):
 
     @ property
     def screen(self):
-        y = 0.2126 * self._screen[:, :, 0] + 0.7152 * self._screen[:, :, 1] + 0.0722 * self._screen[:, :, 2]
+        y = 0.2126 * self._screen[:, :, 0] + 0.7152 * \
+            self._screen[:, :, 1] + 0.0722 * self._screen[:, :, 2]
         y = y.astype(np.uint8)
         return imresize(y, self.dims)
 
