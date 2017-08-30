@@ -1,9 +1,14 @@
+import abc
+import six
 import numpy as np
 import numpy.random as nr
 from overrides import overrides
 
 
-class ExplorationStrategy(object):
+@six.add_metaclass(abc.ABCMeta)
+class ExplorationStrategy():
+
+    @abc.abstractmethod
     def noise_action(self, action, t, **kwargs):
         raise NotImplementedError
 
@@ -13,6 +18,7 @@ class ExplorationStrategy(object):
 
 class OUNoise(ExplorationStrategy):
     """docstring for OUNoise"""
+
     def __init__(self, env, mu=0, theta=0.15, sigma=0.3):
         self.env = env
         self.action_dimension = self.env.action_dim
@@ -32,7 +38,6 @@ class OUNoise(ExplorationStrategy):
         self.state = x + dx
         return self.state
 
-    @overrides
     def noise_action(self, action, t=1, **kwargs):
         ou_state = self.add_noise()
         return np.clip(action + ou_state, self.env.action_low, self.env.action_high)
@@ -42,6 +47,7 @@ class GaussianStrategy(ExplorationStrategy):
     """
         This strategy adds Gaussian noise to the action taken by the deterministic policy.
     """
+
     def __init__(self, env, max_sigma=1.0, min_sigma=0.1, decay_period=1000000):
         assert len(env.action_space.shape) == 1
         self._max_sigma = max_sigma
@@ -49,7 +55,8 @@ class GaussianStrategy(ExplorationStrategy):
         self._decay_period = decay_period
         self._action_space = env.action_space
 
-    @overrides
     def noise_action(self, action, t, **kwargs):
-        sigma = self._max_sigma - (self._max_sigma - self._min_sigma) * min(1.0, t * 1.0) / self._decay_period
+        sigma = self._max_sigma - \
+            (self._max_sigma - self._min_sigma) * \
+            min(1.0, t * 1.0) / self._decay_period
         return np.clip(action + np.random.normal(size=len(action)) * sigma, self.env.action_low, self.env.action_high)
